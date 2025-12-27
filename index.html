@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paz no Ninho</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+          --theme-bg: #FFF1F2;
+          --theme-accent: #F472B6;
+          --theme-accent-soft: #FBCFE8;
+        }
+
+        /* Classes de Tema aplicadas ao BODY */
+        body.theme-pink { --theme-bg: #FFF1F2; --theme-accent: #F472B6; --theme-accent-soft: #FBCFE8; }
+        body.theme-lavender { --theme-bg: #F5F3FF; --theme-accent: #A78BFA; --theme-accent-soft: #DDD6FE; }
+        body.theme-mint { --theme-bg: #F0FDF4; --theme-accent: #34D399; --theme-accent-soft: #A7F3D0; }
+        body.theme-sunset { --theme-bg: #FFF7ED; --theme-accent: #FB923C; --theme-accent-soft: #FED7AA; }
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: var(--theme-bg);
+            background-image: radial-gradient(var(--theme-accent-soft) 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+            transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, .font-cute { font-family: 'Fredoka', sans-serif; }
+        
+        .soft-ui-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 2px solid #FFFFFF;
+            border-radius: 2.5rem;
+            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.05);
+        }
+
+        .animate-spin-slow {
+            animation: spin-slow 8s linear infinite;
+        }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .floating-heart { animation: float 3s ease-in-out infinite; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0); }
+            50% { transform: translateY(-10px) rotate(10deg); }
+        }
+
+        .pulse-heart { animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "qrcode": "https://esm.sh/qrcode"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
