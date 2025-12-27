@@ -2,10 +2,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { User, Couple, Reward, PaymentResponse } from '../types';
 
-/**
- * 🚀 CONFIGURAÇÃO CORRIGIDA
- * Conectado ao projeto: czvowbxipooudzkkixjm
- */
 const SUPABASE_URL = 'https://czvowbxipooudzkkixjm.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6dm93YnhpcG9vdWR6a2tpeGptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4MDA3NTQsImV4cCI6MjA4MjM3Njc1NH0.yIkJ1f2QtqUuwsKLWHUtPQZkZyUPUEAEa3fwOK0HMVk';
 
@@ -14,98 +10,79 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export const dbService = {
   async login(email: string): Promise<User | null> {
     try {
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
-
+      const { data: user, error } = await supabase.from('users').select('*').eq('email', email).single();
       if (error && error.code === 'PGRST116') {
         const { data: newUser, error: createError } = await supabase
           .from('users')
-          .insert([{ 
-            email, 
-            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}` 
-          }])
-          .select()
-          .single();
-        
+          .insert([{ email, avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}` }])
+          .select().single();
         if (createError) throw createError;
         return newUser;
       }
-
-      if (error) throw error;
       return user;
-    } catch (e: any) {
-      console.error("Erro no dbService.login:", e);
-      throw new Error(e.message || "Falha na conexão com o banco de dados.");
-    }
+    } catch (e: any) { throw e; }
   },
 
-  async generatePayment(buyerEmail: string): Promise<PaymentResponse> {
-    // Note: Certifique-se de que a Edge Function 'mercadopago-checkout' existe no seu Supabase
+  async generatePayment(buyerEmail: string, plan: 'monthly' | 'lifetime'): Promise<PaymentResponse> {
+    const amount = plan === 'monthly' ? 2.75 : 11.45;
     const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
       body: { 
         email: buyerEmail,
-        amount: 2.75,
-        description: "Ativação Paz no Ninho 💖"
+        amount: amount,
+        description: `Plano ${plan === 'monthly' ? 'Mensal' : 'Vitalício'} Paz no Ninho 💖`
       }
     });
-
-    if (error) {
-      console.error("Erro ao chamar Edge Function:", error);
-      throw new Error("Erro na comunicação com o servidor de pagamento. Verifique se a Edge Function 'mercadopago-checkout' está implantada.");
-    }
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
+    if (error || data.error) throw new Error(data?.error || "Erro ao gerar Pix.");
     return data as PaymentResponse;
   },
 
   async checkPaymentStatus(paymentId: string): Promise<string> {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-payment', {
-        body: { paymentId }
-      });
-      if (error) return 'pending';
-      return data.status;
-    } catch (e) {
-      return 'pending';
-    }
+    const { data } = await supabase.functions.invoke('check-payment', { body: { paymentId } });
+    return data?.status || 'pending';
   },
 
-  async createCouple(userId: string): Promise<Couple> {
+  async createCouple(userId: string, plan: 'monthly' | 'lifetime', referrerCode?: string): Promise<Couple> {
     const invite_code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const isLifetime = plan === 'lifetime';
+    
+    // Calcula expiração: 30 dias se mensal + 5 se indicado
+    let expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + (referrerCode ? 35 : 30));
+
     const { data: couple, error: coupleError } = await supabase
       .from('couples')
       .insert([{ 
         invite_code, 
-        is_paid: true, 
+        is_paid: true,
+        is_lifetime: isLifetime,
+        expires_at: isLifetime ? null : expirationDate.toISOString(),
         current_start_date: new Date().toISOString(),
         theme: 'pink',
         high_scores: []
       }])
-      .select()
-      .single();
+      .select().single();
 
     if (coupleError) throw coupleError;
 
-    await supabase
-      .from('users')
-      .update({ couple_id: couple!.id })
-      .eq('id', userId);
+    // Se houve indicação, bonifica o padrinho
+    if (referrerCode) {
+      const { data: padrinhos } = await supabase.from('couples').select('*').eq('invite_code', referrerCode.toUpperCase()).single();
+      if (padrinhos && padrinhos.expires_at) {
+        let newExp = new Date(padrinhos.expires_at);
+        newExp.setDate(newExp.getDate() + 5);
+        await supabase.from('couples').update({ 
+          expires_at: newExp.toISOString(),
+          referral_count: (padrinhos.referral_count || 0) + 1 
+        }).eq('id', padrinhos.id);
+      }
+    }
 
+    await supabase.from('users').update({ couple_id: couple!.id }).eq('id', userId);
     return couple!;
   },
 
   async getCouple(coupleId: string): Promise<Couple | null> {
-    const { data } = await supabase
-      .from('couples')
-      .select('*')
-      .eq('id', coupleId)
-      .single();
+    const { data } = await supabase.from('couples').select('*').eq('id', coupleId).single();
     return data;
   },
 
@@ -114,12 +91,7 @@ export const dbService = {
   },
 
   async joinCouple(userId: string, code: string): Promise<Couple | null> {
-    const { data: couple } = await supabase
-      .from('couples')
-      .select('*')
-      .eq('invite_code', code)
-      .single();
-
+    const { data: couple } = await supabase.from('couples').select('*').eq('invite_code', code).single();
     if (couple) {
       await supabase.from('users').update({ couple_id: couple.id }).eq('id', userId);
       return couple;
@@ -129,18 +101,8 @@ export const dbService = {
 
   async resetCounter(coupleId: string, currentDays: number): Promise<Couple> {
     const { data: couple } = await supabase.from('couples').select('high_scores').eq('id', coupleId).single();
-    const currentScores = couple?.high_scores || [];
-    const newScores = [...currentScores, currentDays].sort((a, b) => b - a).slice(0, 3);
-    
-    const { data: updated } = await supabase
-      .from('couples')
-      .update({ 
-        current_start_date: new Date().toISOString(), 
-        high_scores: newScores 
-      })
-      .eq('id', coupleId)
-      .select()
-      .single();
+    const newScores = [...(couple?.high_scores || []), currentDays].sort((a, b) => b - a).slice(0, 3);
+    const { data: updated } = await supabase.from('couples').update({ current_start_date: new Date().toISOString(), high_scores: newScores }).eq('id', coupleId).select().single();
     return updated!;
   },
 
