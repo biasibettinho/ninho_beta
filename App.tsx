@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Couple, Reward, PaymentResponse } from './types';
 import { dbService } from './services/db';
-import { Heart, Share2, LogOut, History, ShieldAlert, Sparkles, Trophy, Camera, Palette, CheckCircle, CreditCard, Settings, Gift, Copy, Check, ExternalLink, Loader2, PartyPopper, AlertCircle, Zap, Calendar, Crown, Users } from 'lucide-react';
+import { Heart, Share2, LogOut, History, ShieldAlert, Sparkles, Trophy, Camera, Palette, CheckCircle, CreditCard, Settings, Gift, Copy, Check, ExternalLink, Loader2, PartyPopper, AlertCircle, Zap, Calendar, Crown, Users, Clock } from 'lucide-react';
 import Counter from './components/Counter';
 import Rewards from './components/Rewards';
 
@@ -39,7 +39,10 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (couple) document.body.className = `theme-${couple.theme}`;
+    if (couple) {
+      document.documentElement.className = `theme-${couple.theme}`;
+      document.body.className = `theme-${couple.theme}`;
+    }
   }, [couple]);
 
   useEffect(() => {
@@ -52,7 +55,6 @@ const App: React.FC = () => {
             setPaymentSuccess(true);
             clearInterval(interval);
             
-            // Agora sim salvamos o usuário e criamos o ninho
             const validatedUser = await dbService.ensureUser(user?.email || emailInput);
             setUser(validatedUser);
             localStorage.setItem('paz_no_ninho_user_email', validatedUser.email);
@@ -73,7 +75,6 @@ const App: React.FC = () => {
     try {
       const loggedUser = await dbService.login(email);
       if (!loggedUser) {
-        // Usuário não existe, marcamos como novo e permitimos que ele pague para entrar
         setIsNewUser(true);
         setUser(null);
       } else {
@@ -92,11 +93,12 @@ const App: React.FC = () => {
   };
 
   const startPaymentFlow = async () => {
+    if (!emailInput && !user?.email) return alert("E-mail não identificado.");
     setIsGeneratingPayment(true);
     try {
       const res = await dbService.generatePayment(user?.email || emailInput, selectedPlan);
       setPaymentData(res);
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { alert(e.message || "Erro ao gerar cobrança. Verifique sua conexão."); }
     finally { setIsGeneratingPayment(false); }
   };
 
@@ -118,7 +120,7 @@ const App: React.FC = () => {
   };
 
   if (isLoading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-pink-50">
+    <div className="min-h-screen flex flex-col items-center justify-center">
       <div className="relative">
         <Heart className="w-16 h-16 text-pink-400 fill-pink-300 animate-bounce" />
         <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-pulse" />
@@ -127,7 +129,6 @@ const App: React.FC = () => {
     </div>
   );
 
-  // Se não tem usuário OU se o usuário existe mas não tem casal, mostra tela inicial
   if (!user || !couple) {
     if (!user && !isNewUser) {
       return (
@@ -157,11 +158,12 @@ const App: React.FC = () => {
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-blue-50 to-white">
-        <div className="w-full max-w-md soft-ui-card p-10 text-center border-4 border-blue-100 shadow-2xl">
+        <div className="w-full max-w-md soft-ui-card p-10 text-center border-4 border-blue-100 shadow-2xl relative">
           <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner border-8 border-white">
             <Sparkles className="w-12 h-12 text-white animate-spin-slow" />
           </div>
-          <h2 className="text-4xl font-black mb-10 text-gray-800 font-cute">Seu Refúgio ✨</h2>
+          <h2 className="text-4xl font-black mb-1 text-gray-800 font-cute">Seu Refúgio ✨</h2>
+          <p className="text-gray-400 font-bold mb-10 text-sm">{emailInput}</p>
           
           <button onClick={() => setShowPayment(true)} className="w-full bg-gradient-to-br from-pink-500 to-rose-500 text-white font-black text-2xl py-8 rounded-[3rem] mb-8 shadow-xl hover:scale-105 transition-all border-b-8 border-rose-700">
             CRIAR NOSSO NINHO
@@ -178,21 +180,26 @@ const App: React.FC = () => {
             value={inviteInput} onChange={e => setInviteInput(e.target.value)}
           />
           <button onClick={async () => {
-            // Se for novo usuário entrando via convite, precisamos salvá-lo agora
-            const validatedUser = await dbService.ensureUser(emailInput);
-            setUser(validatedUser);
-            localStorage.setItem('paz_no_ninho_user_email', validatedUser.email);
-            
-            const c = await dbService.joinCouple(validatedUser.id, inviteInput.toUpperCase());
-            if(c) window.location.reload();
-            else alert('Código não encontrado! 🥺');
-          }} className="w-full bg-gray-800 text-white font-black py-6 rounded-[2.5rem] hover:bg-black transition-all shadow-lg">CONECTAR AGORA</button>
+            try {
+              const validatedUser = await dbService.ensureUser(emailInput);
+              setUser(validatedUser);
+              localStorage.setItem('paz_no_ninho_user_email', validatedUser.email);
+              
+              const c = await dbService.joinCouple(validatedUser.id, inviteInput.toUpperCase());
+              if(c) window.location.reload();
+              else alert('Código não encontrado! 🥺');
+            } catch (e) { alert("Erro ao conectar ao ninho."); }
+          }} className="w-full bg-gray-800 text-white font-black py-6 rounded-[2.5rem] hover:bg-black transition-all shadow-lg mb-6">CONECTAR AGORA</button>
+          
+          <button onClick={() => { setIsNewUser(false); setUser(null); setEmailInput(''); }} className="text-gray-400 font-black text-xs uppercase tracking-widest hover:text-pink-500 transition-colors">
+             Não é você? Sair
+          </button>
         </div>
 
         {showPayment && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[500] flex items-center justify-center p-6 overflow-y-auto">
             <div className="bg-white rounded-[4rem] p-8 w-full max-w-sm text-center border-[12px] border-pink-50 shadow-2xl relative">
-              <button onClick={() => setShowPayment(false)} className="absolute top-4 right-8 text-gray-300 font-black text-2xl">×</button>
+              <button onClick={() => { setShowPayment(false); setPaymentData(null); }} className="absolute top-4 right-8 text-gray-300 font-black text-2xl">×</button>
               
               {paymentSuccess ? (
                 <div className="py-12">
@@ -248,7 +255,7 @@ const App: React.FC = () => {
                   <button 
                     disabled={isGeneratingPayment}
                     onClick={startPaymentFlow}
-                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xl py-6 rounded-[2.5rem] shadow-xl flex items-center justify-center gap-3"
+                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xl py-6 rounded-[2.5rem] shadow-xl flex items-center justify-center gap-3 disabled:opacity-50"
                   >
                     {isGeneratingPayment ? <Loader2 className="w-7 h-7 animate-spin" /> : <>Gerar Pix <Zap className="fill-white" /></>}
                   </button>
@@ -257,7 +264,7 @@ const App: React.FC = () => {
                 <div className="animate-in slide-in-from-bottom-6">
                   <div className="flex justify-center mb-6">
                      <div className="p-4 bg-white border-8 border-pink-50 rounded-[3rem] shadow-xl">
-                        <div className="w-56 h-56 bg-gray-50 flex items-center justify-center rounded-3xl overflow-hidden">
+                        <div className="w-56 h-56 bg-gray-50 flex items-center justify-center rounded-3xl overflow-hidden border-4 border-dashed border-gray-100">
                           {paymentData.qr_code_base64 && <img src={`data:image/png;base64,${paymentData.qr_code_base64}`} className="w-full h-full p-2" alt="Pix" />}
                         </div>
                      </div>
@@ -273,7 +280,7 @@ const App: React.FC = () => {
                     {copied ? <Check /> : <Copy className="w-5 h-5" />}
                     {copied ? "COPIADO!" : "COPIAR PIX"}
                   </button>
-                  <button onClick={() => setPaymentData(null)} className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em]">Voltar e Mudar Plano</button>
+                  <button onClick={() => setPaymentData(null)} className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] hover:text-pink-500 transition-colors">Voltar e Mudar Plano</button>
                 </div>
               )}
             </div>
@@ -290,7 +297,9 @@ const App: React.FC = () => {
       <header className="flex justify-between items-center mb-10 px-4 bg-white/80 p-4 rounded-[3rem] border-4 border-white shadow-xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-500 relative z-10">
         <div className="flex items-center gap-4">
           <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-            <img src={couple.couple_photo || user.avatar_url} className="w-16 h-16 rounded-3xl border-4 border-pink-50 shadow-lg object-cover rotate-3 group-hover:rotate-0 transition-transform" alt="Couple" />
+            <div className="w-16 h-16 rounded-3xl border-4 border-pink-50 shadow-lg bg-gray-100 overflow-hidden rotate-3 group-hover:rotate-0 transition-transform">
+              <img src={couple.couple_photo || user.avatar_url} className="w-full h-full object-cover" alt="Couple" />
+            </div>
             <div className="absolute -bottom-2 -right-2 bg-pink-500 text-white p-2 rounded-2xl shadow-xl border-2 border-white"><Camera className="w-4 h-4" /></div>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
               const f = e.target.files?.[0];
@@ -318,12 +327,12 @@ const App: React.FC = () => {
         <button onClick={() => { localStorage.removeItem('paz_no_ninho_user_email'); window.location.reload(); }} className="p-3 text-pink-200 hover:text-red-500 transition-colors"><LogOut className="w-6 h-6" /></button>
       </header>
 
-      {/* BANNER DE ASSINATURA - DOPAMINA */}
       {!couple.is_lifetime && remainingDays !== null && (
         <div className={`mb-8 p-6 rounded-[2.5rem] border-4 shadow-xl flex items-center justify-between transition-all ${remainingDays < 5 ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-green-50 border-green-200 text-green-700'}`}>
           <div className="flex items-center gap-4">
-             <div className={`p-4 rounded-2xl shadow-inner ${remainingDays < 5 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                <Calendar className="w-6 h-6" />
+             <div className={`p-4 rounded-2xl shadow-inner relative flex items-center justify-center ${remainingDays < 5 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                <Calendar className="w-6 h-6 absolute" />
+                <Clock className={`w-10 h-10 opacity-40 ${remainingDays < 5 ? 'animate-spin' : 'animate-spin-slow'}`} />
              </div>
              <div>
                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Acesso Premium</p>
@@ -401,7 +410,10 @@ const App: React.FC = () => {
             <h3 className="text-xl font-black mb-10 flex items-center gap-4 text-pink-600 font-cute"><Palette className="w-8 h-8" /> Visual do Ninho</h3>
             <div className="grid grid-cols-2 gap-6 mb-12">
               {['pink', 'lavender', 'mint', 'sunset'].map(t => (
-                <button key={t} onClick={() => { dbService.updateCouple(couple.id, { theme: t as any }); setCouple({...couple, theme: t as any}); }} className={`p-8 rounded-[2.5rem] font-black text-sm capitalize border-4 transition-all shadow-lg ${couple.theme === t ? 'border-pink-500 bg-pink-50 text-pink-600 scale-105' : 'border-transparent bg-gray-50 text-gray-300 opacity-60'}`}>
+                <button key={t} onClick={async () => { 
+                  await dbService.updateCouple(couple.id, { theme: t as any }); 
+                  setCouple({...couple, theme: t as any}); 
+                }} className={`p-8 rounded-[2.5rem] font-black text-sm capitalize border-4 transition-all shadow-lg ${couple.theme === t ? 'border-pink-500 bg-pink-50 text-pink-600 scale-105' : 'border-transparent bg-gray-50 text-gray-300 opacity-60'}`}>
                   <div className={`w-full h-3 rounded-full mb-3 bg-current opacity-20`}></div>
                   {t}
                 </button>

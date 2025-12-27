@@ -10,18 +10,19 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export const dbService = {
   async login(email: string): Promise<User | null> {
     try {
-      const { data: user } = await supabase.from('users').select('*').eq('email', email).single();
-      return user; // Retorna null se não encontrar, sem criar nada ainda.
+      const { data: user } = await supabase.from('users').select('*').eq('email', email.toLowerCase().trim()).single();
+      return user;
     } catch (e: any) { return null; }
   },
 
   async ensureUser(email: string): Promise<User> {
-    const { data: existingUser } = await supabase.from('users').select('*').eq('email', email).single();
+    const cleanEmail = email.toLowerCase().trim();
+    const { data: existingUser } = await supabase.from('users').select('*').eq('email', cleanEmail).single();
     if (existingUser) return existingUser;
 
     const { data: newUser, error } = await supabase
       .from('users')
-      .insert([{ email, avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}` }])
+      .insert([{ email: cleanEmail, avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}` }])
       .select().single();
     if (error) throw error;
     return newUser;
@@ -29,20 +30,37 @@ export const dbService = {
 
   async generatePayment(buyerEmail: string, plan: 'monthly' | 'lifetime'): Promise<PaymentResponse> {
     const amount = plan === 'monthly' ? 2.75 : 11.45;
-    const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
-      body: { 
-        email: buyerEmail,
-        amount: amount,
-        description: `Plano ${plan === 'monthly' ? 'Mensal' : 'Vitalício'} Paz no Ninho 💖`
+    try {
+      const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
+        body: { 
+          email: buyerEmail.toLowerCase().trim(),
+          amount: amount,
+          description: `Plano ${plan === 'monthly' ? 'Mensal' : 'Vitalício'} Paz no Ninho 💖`
+        }
+      });
+      
+      if (error) {
+        console.error("Erro na função Supabase:", error);
+        throw new Error("Não foi possível conectar ao provedor de pagamento.");
       }
-    });
-    if (error || data.error) throw new Error(data?.error || "Erro ao gerar Pix.");
-    return data as PaymentResponse;
+      
+      if (!data || data.error) {
+        throw new Error(data?.error || "Erro ao gerar o Pix no Mercado Pago.");
+      }
+
+      return data as PaymentResponse;
+    } catch (err: any) {
+      throw new Error(err.message || "Falha ao gerar pagamento.");
+    }
   },
 
   async checkPaymentStatus(paymentId: string): Promise<string> {
-    const { data } = await supabase.functions.invoke('check-payment', { body: { paymentId } });
-    return data?.status || 'pending';
+    try {
+      const { data } = await supabase.functions.invoke('check-payment', { body: { paymentId } });
+      return data?.status || 'pending';
+    } catch {
+      return 'pending';
+    }
   },
 
   async createCouple(userId: string, plan: 'monthly' | 'lifetime', referrerCode?: string): Promise<Couple> {
@@ -61,7 +79,8 @@ export const dbService = {
         expires_at: isLifetime ? null : expirationDate.toISOString(),
         current_start_date: new Date().toISOString(),
         theme: 'pink',
-        high_scores: []
+        high_scores: [],
+        referral_count: 0
       }])
       .select().single();
 
@@ -69,13 +88,14 @@ export const dbService = {
 
     if (referrerCode) {
       const { data: padrinhos } = await supabase.from('couples').select('*').eq('invite_code', referrerCode.toUpperCase()).single();
-      if (padrinhos && padrinhos.expires_at) {
-        let newExp = new Date(padrinhos.expires_at);
-        newExp.setDate(newExp.getDate() + 5);
-        await supabase.from('couples').update({ 
-          expires_at: newExp.toISOString(),
-          referral_count: (padrinhos.referral_count || 0) + 1 
-        }).eq('id', padrinhos.id);
+      if (padrinhos) {
+        let updates: any = { referral_count: (padrinhos.referral_count || 0) + 1 };
+        if (padrinhos.expires_at) {
+          let newExp = new Date(padrinhos.expires_at);
+          newExp.setDate(newExp.getDate() + 5);
+          updates.expires_at = newExp.toISOString();
+        }
+        await supabase.from('couples').update(updates).eq('id', padrinhos.id);
       }
     }
 
@@ -93,7 +113,7 @@ export const dbService = {
   },
 
   async joinCouple(userId: string, code: string): Promise<Couple | null> {
-    const { data: couple } = await supabase.from('couples').select('*').eq('invite_code', code).single();
+    const { data: couple } = await supabase.from('couples').select('*').eq('invite_code', code.toUpperCase()).single();
     if (couple) {
       await supabase.from('users').update({ couple_id: couple.id }).eq('id', userId);
       return couple;
