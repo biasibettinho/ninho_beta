@@ -10,6 +10,9 @@ export interface Couple {
   id: string;
   invite_code: string;
   current_start_date: string;
+  expires_at: string | null;
+  is_lifetime: boolean;
+  referral_count: number;
   high_scores: number[];
   partner_names: string[];
   theme: 'pink' | 'lavender' | 'mint' | 'sunset';
