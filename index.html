@@ -16,24 +16,25 @@
           --theme-accent-soft: #FBCFE8;
         }
 
-        /* Classes de Tema aplicadas ao HTML/Root para maior compatibilidade */
-        .theme-pink { --theme-bg: #FFF1F2; --theme-accent: #F472B6; --theme-accent-soft: #FBCFE8; }
-        .theme-lavender { --theme-bg: #F5F3FF; --theme-accent: #A78BFA; --theme-accent-soft: #DDD6FE; }
-        .theme-mint { --theme-bg: #F0FDF4; --theme-accent: #34D399; --theme-accent-soft: #A7F3D0; }
-        .theme-sunset { --theme-bg: #FFF7ED; --theme-accent: #FB923C; --theme-accent-soft: #FED7AA; }
-
-        html, body {
+        html, body, #root {
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background-color: var(--theme-bg);
-            transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
         }
 
         body {
             font-family: 'Fredoka', sans-serif;
+            background-color: var(--theme-bg);
+            transition: background-color 0.5s ease;
+        }
+
+        .theme-wrapper {
+            min-height: 100vh;
+            background-color: var(--theme-bg);
             background-image: radial-gradient(var(--theme-accent-soft) 1px, transparent 1px);
             background-size: 32px 32px;
+            transition: all 0.5s ease;
         }
 
         h1, h2, h3, .font-cute { font-family: 'Fredoka', sans-serif; }
